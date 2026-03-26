@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
+import { startOfflineQueueProcessor } from '../src/lib/offlineQueue';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -88,6 +89,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     hydrate().finally(() => SplashScreen.hideAsync());
+
+    // Startet Offline-Queue-Prozessor — wiederholt gespeicherte Mutations bei Reconnect
+    const stopQueue = startOfflineQueueProcessor();
+    return stopQueue;
   }, []);
 
   // Register push token after user is authenticated

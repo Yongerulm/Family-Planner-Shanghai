@@ -106,7 +106,7 @@ services:
       - "traefik.http.routers.admin.rule=Host(`admin.${DOMAIN}`)"
       - "traefik.http.routers.admin.entrypoints=websecure"
       - "traefik.http.routers.admin.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.admin.middlewares=security-headers@file"
+      - "traefik.http.routers.admin.middlewares=admin-headers@file,admin-ratelimit@file"
       - "traefik.http.services.admin.loadbalancer.server.port=3001"
       - "traefik.docker.network=family_public"
 

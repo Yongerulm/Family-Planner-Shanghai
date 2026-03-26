@@ -28,6 +28,22 @@ http:
         customResponseHeaders:
           X-Powered-By: ""
           Server: ""
+
+    # Admin Panel: zusätzliche Headers (noindex via HTTP-Header zusätzlich zum meta-Tag)
+    admin-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+          X-Robots-Tag: "noindex, nofollow, nosnippet, noarchive"
         contentSecurityPolicy: >
           default-src 'self';
           script-src 'self' 'unsafe-inline';

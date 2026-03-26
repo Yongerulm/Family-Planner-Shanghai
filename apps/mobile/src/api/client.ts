@@ -23,7 +23,47 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// ─── Token Refresh ────────────────────────────────────────────────────────────
+// ─── Retry-Interceptor (transiente Netzwerkfehler + 5xx) ────────────────────
+// Retries: 3 Versuche, exponential backoff 1s / 2s / 4s
+// Wird NICHT bei 4xx ausgeführt (Client-Fehler → kein Retry sinnvoll)
+
+const MAX_RETRIES = 3;
+
+apiClient.interceptors.response.use(
+  (r) => r,
+  async (error: AxiosError) => {
+    const config = error.config as AxiosRequestConfig & {
+      _retry?: boolean;
+      _retryCount?: number;
+    };
+
+    if (!config) return Promise.reject(error);
+
+    const status = error.response?.status;
+    const isNetworkError = !error.response; // Timeout, no connection
+    const isServerError = status !== undefined && status >= 500;
+    const isRetryable = isNetworkError || isServerError;
+
+    // 401 wird vom Token-Refresh-Interceptor darunter behandelt
+    if (!isRetryable || status === 401) {
+      return Promise.reject(error);
+    }
+
+    config._retryCount = (config._retryCount ?? 0) + 1;
+
+    if (config._retryCount > MAX_RETRIES) {
+      return Promise.reject(error);
+    }
+
+    // Exponential backoff: 1s, 2s, 4s
+    const delay = 1000 * Math.pow(2, config._retryCount - 1);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    return apiClient(config);
+  },
+);
+
+// ─── Token Refresh (401) ──────────────────────────────────────────────────────
 
 let refreshPromise: Promise<string> | null = null;
 
@@ -32,7 +72,7 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as AxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
 
       if (!refreshPromise) {
@@ -49,7 +89,6 @@ apiClient.interceptors.response.use(
         // Refresh gescheitert → Logout
         await SecureStore.deleteItemAsync('fp_access_token');
         await SecureStore.deleteItemAsync('fp_refresh_token');
-        // AuthStore wird durch useAuthStore.getState().logout() informiert
         const { useAuthStore } = await import('../stores/auth.store');
         useAuthStore.getState().logout();
         return Promise.reject(error);

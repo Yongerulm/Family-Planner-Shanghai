@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import SessionRestorer from '@/components/SessionRestorer';
 
 export const metadata: Metadata = {
   title: 'Family Planner Admin',
@@ -10,7 +11,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de">
-      <body>{children}</body>
+      <body>
+        {/* Stellt In-Memory Access Token bei Seiten-Reload wieder her */}
+        <SessionRestorer />
+        {children}
+      </body>
     </html>
   );
 }

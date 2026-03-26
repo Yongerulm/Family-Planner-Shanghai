@@ -17,20 +17,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await login(email, password);
-
-      if (result.user.role !== 'super_admin' && result.user.role !== 'family_admin') {
-        setError('Kein Admin-Zugang. Nur super_admin und family_admin können sich einloggen.');
-        return;
-      }
-
-      localStorage.setItem('fp_access_token', result.accessToken);
-      localStorage.setItem('fp_refresh_token', result.refreshToken);
-      localStorage.setItem('fp_user_role', result.user.role);
-
+      // login() ruft /api/auth/login (Next.js Route Handler) auf:
+      // - Rollenprüfung erfolgt server-seitig im Route Handler
+      // - Setzt httpOnly Refresh-Token-Cookie (JS kann ihn nicht lesen)
+      // - Speichert Access Token in-memory in api.ts (kein localStorage)
+      await login(email, password);
       router.push('/dashboard');
-    } catch {
-      setError('Login fehlgeschlagen. E-Mail oder Passwort falsch.');
+    } catch (err) {
+      setError((err as Error).message || 'Login fehlgeschlagen. E-Mail oder Passwort falsch.');
     } finally {
       setLoading(false);
     }

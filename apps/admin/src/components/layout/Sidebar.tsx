@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
+import { logout } from '@/lib/api';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -14,8 +15,8 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  function logout() {
-    localStorage.clear();
+  async function handleLogout() {
+    await logout(); // löscht in-memory Token + httpOnly Cookie
     router.push('/login');
   }
 
@@ -46,7 +47,7 @@ export default function Sidebar() {
 
       <div className="px-4 py-4 border-t border-gray-700">
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="w-full text-left text-sm text-gray-400 hover:text-white transition-colors"
         >
           ← Ausloggen
