@@ -1,14 +1,18 @@
 # ─── Stage 1: Dependencies ───────────────────────────────────────────────────
+# Build-Context ist das Repo-Root (context: ./ in docker-compose.yml)
+# Das ermöglicht Zugriff auf pnpm-lock.yaml und packages/shared
 FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-# pnpm installieren
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Package files kopieren
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --prod=false
+# Root-Lockfile + workspace package.json kopieren
+COPY pnpm-lock.yaml package.json ./
+COPY packages/backend/package.json ./packages/backend/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN pnpm install --frozen-lockfile
 
 # ─── Stage 2: Builder ────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
@@ -17,11 +21,25 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY package.json pnpm-lock.yaml* ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY pnpm-lock.yaml package.json ./
+COPY packages/backend/package.json ./packages/backend/
+COPY packages/shared/package.json ./packages/shared/
 
-RUN pnpm run build
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/backend/node_modules ./packages/backend/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+
+# Source kopieren
+COPY packages/shared/src/ ./packages/shared/src/
+COPY packages/shared/tsconfig.json ./packages/shared/
+COPY packages/backend/src/ ./packages/backend/src/
+COPY packages/backend/tsconfig.json ./packages/backend/
+COPY packages/backend/tsconfig.build.json ./packages/backend/
+
+# shared zuerst bauen (falls vorhanden), dann backend
+# "pnpm run build" = "tsc -p tsconfig.json" → kompiliert src/**/* inkl. main.worker + main.scheduler
+RUN cd packages/shared && pnpm run build 2>/dev/null || true
+RUN cd packages/backend && pnpm run build
 
 # ─── Stage 3: Production ─────────────────────────────────────────────────────
 FROM node:22-alpine AS production
@@ -35,12 +53,19 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Nur Production Dependencies
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --prod=true && \
+COPY pnpm-lock.yaml package.json ./
+COPY packages/backend/package.json ./packages/backend/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN pnpm install --frozen-lockfile --prod && \
     pnpm store prune
 
 # Build artifacts
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist 2>/dev/null || true
+
+# Convenience symlink: node dist/main → packages/backend/dist/main
+RUN ln -sf /app/packages/backend/dist /app/dist
 
 # Logs-Verzeichnis
 RUN mkdir -p /app/logs && chown nestjs:nestjs /app/logs
@@ -54,4 +79,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["node", "packages/backend/dist/main"]

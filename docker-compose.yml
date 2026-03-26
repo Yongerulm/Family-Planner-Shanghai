@@ -38,8 +38,8 @@ services:
   # ─── API ────────────────────────────────────────────────────────────────────
   api:
     build:
-      context: ./packages/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/backend/Dockerfile
       target: production
     image: family-planner/api:${APP_VERSION:-latest}
     container_name: family_api
@@ -113,8 +113,8 @@ services:
   # ─── WORKER (BullMQ Job-Processor) ──────────────────────────────────────────
   worker:
     build:
-      context: ./packages/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/backend/Dockerfile
       target: production
     image: family-planner/api:${APP_VERSION:-latest}
     container_name: family_worker
@@ -133,13 +133,13 @@ services:
       APP_MODE: worker
     volumes:
       - app_logs:/app/logs
-    command: ["node", "dist/main.worker"]
+    command: ["node", "packages/backend/dist/main.worker"]
 
   # ─── SCHEDULER (Cron Jobs) ───────────────────────────────────────────────────
   scheduler:
     build:
-      context: ./packages/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/backend/Dockerfile
       target: production
     image: family-planner/api:${APP_VERSION:-latest}
     container_name: family_scheduler
@@ -158,7 +158,7 @@ services:
       APP_MODE: scheduler
     volumes:
       - app_logs:/app/logs
-    command: ["node", "dist/main.scheduler"]
+    command: ["node", "packages/backend/dist/main.scheduler"]
 
   # ─── POSTGRESQL ─────────────────────────────────────────────────────────────
   postgres:
@@ -193,7 +193,11 @@ services:
     volumes:
       - redis_data:/data
       - ./infrastructure/redis/redis.conf:/etc/redis/redis.conf:ro
-    command: redis-server /etc/redis/redis.conf
+    # --requirepass aus ENV, da redis.conf kein Shell-Variable-Expansion unterstützt
+    command: >
+      redis-server /etc/redis/redis.conf
+      --requirepass ${REDIS_PASSWORD}
+      --protected-mode yes
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s

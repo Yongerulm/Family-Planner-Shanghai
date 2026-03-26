@@ -103,6 +103,10 @@ async function bootstrap() {
     logger.info(`Swagger docs available at: http://localhost:${port}/api/docs`);
   }
 
+  // Graceful shutdown on SIGTERM/SIGINT (docker compose stop sends SIGTERM)
+  // Without this, the container waits ~10s then gets SIGKILL → dirty DB disconnect
+  app.enableShutdownHooks();
+
   await app.listen(port);
   logger.info(`Family Planner API running on port ${port} [${nodeEnv}]`);
 }

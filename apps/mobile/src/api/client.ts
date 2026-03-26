@@ -113,4 +113,12 @@ export const notificationsApi = {
   getAll: () => apiClient.get('/notifications'),
   markRead: (id: string) => apiClient.patch(`/notifications/${id}/read`),
   markAllRead: () => apiClient.post('/notifications/read-all'),
+  registerDeviceToken: (payload: {
+    deviceId: string;
+    platform: 'apns' | 'fcm';
+    pushToken: string;
+    appVersion?: string;
+  }) => apiClient.patch('/notifications/device-token', payload),
+  removeDeviceToken: (deviceId: string) =>
+    apiClient.delete(`/notifications/device-token/${deviceId}`),
 };
