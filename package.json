@@ -1,0 +1,33 @@
+{
+  "name": "family-planner-shanghai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Family Planner - Self-hosted, China-ready, production-grade family app",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:backend": "pnpm --filter @family-planner/backend dev",
+    "dev:admin": "pnpm --filter @family-planner/admin dev",
+    "build:backend": "pnpm --filter @family-planner/backend build",
+    "build:admin": "pnpm --filter @family-planner/admin build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @family-planner/backend migration:run",
+    "db:migrate:revert": "pnpm --filter @family-planner/backend migration:revert",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:build": "docker compose build"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  }
+}

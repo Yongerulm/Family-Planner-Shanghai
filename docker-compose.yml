@@ -1,0 +1,255 @@
+version: '3.9'
+
+networks:
+  public:
+    name: family_public
+  internal:
+    name: family_internal
+    internal: true
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  traefik_certs:
+    driver: local
+  app_logs:
+    driver: local
+
+services:
+
+  # ─── REVERSE PROXY ──────────────────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.0
+    container_name: family_traefik
+    restart: unless-stopped
+    networks:
+      - public
+      - internal
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_certs:/certs
+      - ./infrastructure/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./infrastructure/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    labels:
+      - "traefik.enable=false"
+
+  # ─── API ────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+      target: production
+    image: family-planner/api:${APP_VERSION:-latest}
+    container_name: family_api
+    restart: unless-stopped
+    networks:
+      - public
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - app_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.api.middlewares=security-headers@file,api-ratelimit@file"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+      - "traefik.docker.network=family_public"
+
+  # ─── ADMIN WEB ──────────────────────────────────────────────────────────────
+  admin-web:
+    build:
+      context: ./packages/admin
+      dockerfile: Dockerfile
+      target: production
+    image: family-planner/admin-web:${APP_VERSION:-latest}
+    container_name: family_admin
+    restart: unless-stopped
+    networks:
+      - public
+      - internal
+    depends_on:
+      api:
+        condition: service_healthy
+    env_file:
+      - .env.admin
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - NEXT_PUBLIC_API_URL=https://api.${DOMAIN}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin.rule=Host(`admin.${DOMAIN}`)"
+      - "traefik.http.routers.admin.entrypoints=websecure"
+      - "traefik.http.routers.admin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.admin.middlewares=security-headers@file"
+      - "traefik.http.services.admin.loadbalancer.server.port=3001"
+      - "traefik.docker.network=family_public"
+
+  # ─── WORKER ─────────────────────────────────────────────────────────────────
+  worker:
+    image: family-planner/api:${APP_VERSION:-latest}
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: family_worker
+    restart: unless-stopped
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - APP_MODE=worker
+    volumes:
+      - app_logs:/app/logs
+    command: ["node", "dist/main.worker.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ─── SCHEDULER ──────────────────────────────────────────────────────────────
+  scheduler:
+    image: family-planner/api:${APP_VERSION:-latest}
+    container_name: family_scheduler
+    restart: unless-stopped
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - APP_MODE=scheduler
+    volumes:
+      - app_logs:/app/logs
+    command: ["node", "dist/main.scheduler.js"]
+
+  # ─── POSTGRESQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: family_postgres
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # KEIN Port-Mapping nach außen! Nur internes Netzwerk.
+
+  # ─── REDIS ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: family_redis
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # KEIN Port-Mapping nach außen!
+
+  # ─── MINIO ──────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: family_minio
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: "off"
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    # KEIN Port-Mapping nach außen!
+    # MinIO Console via SSH-Tunnel: ssh -L 9001:minio:9001 user@vps
+
+  # ─── UPTIME KUMA (optional) ─────────────────────────────────────────────────
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: family_uptime
+    restart: unless-stopped
+    networks:
+      - public
+      - internal
+    volumes:
+      - ./infrastructure/uptime-kuma:/app/data
+    profiles:
+      - monitoring
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.status.rule=Host(`status.${DOMAIN}`)"
+      - "traefik.http.routers.status.entrypoints=websecure"
+      - "traefik.http.routers.status.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.status.middlewares=security-headers@file"
+      - "traefik.http.services.status.loadbalancer.server.port=3001"
+      - "traefik.docker.network=family_public"
