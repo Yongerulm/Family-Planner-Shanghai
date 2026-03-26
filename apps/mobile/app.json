@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Family Planner",
+    "slug": "family-planner-shanghai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "bundleIdentifier": "com.yourname.familyplanner",
+      "supportsTablet": true,
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Zum Hochladen von Fotos für Rezepte und Dokumente",
+        "NSPhotoLibraryUsageDescription": "Zum Auswählen von Fotos aus deiner Bibliothek",
+        "NSPhotoLibraryAddUsageDescription": "Zum Speichern von Fotos in deiner Bibliothek",
+        "NSMicrophoneUsageDescription": "Wird nicht verwendet",
+        "UIBackgroundModes": ["remote-notification"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
+    },
+    "android": {
+      "package": "com.yourname.familyplanner",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", {
+        "icon": "./assets/notification-icon.png",
+        "color": "#2563eb",
+        "sounds": []
+      }],
+      ["expo-image-picker", {
+        "photosPermission": "Zum Hochladen von Fotos für Rezepte und Dokumente",
+        "cameraPermission": "Zum Fotografieren von Dokumenten"
+      }]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "DEINE_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

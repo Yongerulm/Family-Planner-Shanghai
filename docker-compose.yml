@@ -5,25 +5,20 @@ networks:
     name: family_public
   internal:
     name: family_internal
-    internal: true
+    internal: true  # Kein Internetzugang für interne Services
 
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
   minio_data:
-    driver: local
   traefik_certs:
-    driver: local
   app_logs:
-    driver: local
 
 services:
 
   # ─── REVERSE PROXY ──────────────────────────────────────────────────────────
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.1
     container_name: family_traefik
     restart: unless-stopped
     networks:
@@ -62,8 +57,8 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-      - PORT=3000
+      NODE_ENV: production
+      PORT: "3000"
     volumes:
       - app_logs:/app/logs
     healthcheck:
@@ -84,7 +79,7 @@ services:
   # ─── ADMIN WEB ──────────────────────────────────────────────────────────────
   admin-web:
     build:
-      context: ./packages/admin
+      context: ./apps/admin
       dockerfile: Dockerfile
       target: production
     image: family-planner/admin-web:${APP_VERSION:-latest}
@@ -96,12 +91,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    env_file:
-      - .env.admin
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - NEXT_PUBLIC_API_URL=https://api.${DOMAIN}
+      NODE_ENV: production
+      PORT: "3001"
+      NEXT_PUBLIC_API_URL: "https://api.${DOMAIN}"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001"]
       interval: 30s
@@ -117,13 +110,13 @@ services:
       - "traefik.http.services.admin.loadbalancer.server.port=3001"
       - "traefik.docker.network=family_public"
 
-  # ─── WORKER ─────────────────────────────────────────────────────────────────
+  # ─── WORKER (BullMQ Job-Processor) ──────────────────────────────────────────
   worker:
-    image: family-planner/api:${APP_VERSION:-latest}
     build:
       context: ./packages/backend
       dockerfile: Dockerfile
       target: production
+    image: family-planner/api:${APP_VERSION:-latest}
     container_name: family_worker
     restart: unless-stopped
     networks:
@@ -136,20 +129,18 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-      - APP_MODE=worker
+      NODE_ENV: production
+      APP_MODE: worker
     volumes:
       - app_logs:/app/logs
-    command: ["node", "dist/main.worker.js"]
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    command: ["node", "dist/main.worker"]
 
-  # ─── SCHEDULER ──────────────────────────────────────────────────────────────
+  # ─── SCHEDULER (Cron Jobs) ───────────────────────────────────────────────────
   scheduler:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+      target: production
     image: family-planner/api:${APP_VERSION:-latest}
     container_name: family_scheduler
     restart: unless-stopped
@@ -163,11 +154,11 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-      - APP_MODE=scheduler
+      NODE_ENV: production
+      APP_MODE: scheduler
     volumes:
       - app_logs:/app/logs
-    command: ["node", "dist/main.scheduler.js"]
+    command: ["node", "dist/main.scheduler"]
 
   # ─── POSTGRESQL ─────────────────────────────────────────────────────────────
   postgres:
@@ -190,7 +181,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # KEIN Port-Mapping nach außen! Nur internes Netzwerk.
+    # KEIN Port-Mapping → niemals öffentlich erreichbar
 
   # ─── REDIS ──────────────────────────────────────────────────────────────────
   redis:
@@ -208,11 +199,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # KEIN Port-Mapping nach außen!
+    # KEIN Port-Mapping
 
-  # ─── MINIO ──────────────────────────────────────────────────────────────────
+  # ─── MINIO (S3-kompatibel, selbst gehostet) ─────────────────────────────────
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-10-02T17-50-41Z
     container_name: family_minio
     restart: unless-stopped
     networks:
@@ -230,12 +221,13 @@ services:
       timeout: 20s
       retries: 3
       start_period: 30s
-    # KEIN Port-Mapping nach außen!
-    # MinIO Console via SSH-Tunnel: ssh -L 9001:minio:9001 user@vps
+    # Zugriff auf MinIO-Console nur via SSH-Tunnel:
+    # ssh -L 9001:localhost:9001 user@dein-vps.tld
+    # Dann: http://localhost:9001
 
-  # ─── UPTIME KUMA (optional) ─────────────────────────────────────────────────
+  # ─── UPTIME KUMA (Monitoring — optional) ────────────────────────────────────
   uptime-kuma:
-    image: louislam/uptime-kuma:latest
+    image: louislam/uptime-kuma:1
     container_name: family_uptime
     restart: unless-stopped
     networks:

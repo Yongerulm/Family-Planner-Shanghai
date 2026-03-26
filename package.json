@@ -3,30 +3,32 @@
   "version": "1.0.0",
   "private": true,
   "description": "Family Planner - Self-hosted, China-ready, production-grade family app",
-  "workspaces": [
-    "packages/*"
-  ],
   "engines": {
     "node": ">=22.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev:backend": "pnpm --filter @family-planner/backend dev",
+    "dev:api": "pnpm --filter @family-planner/api dev",
     "dev:admin": "pnpm --filter @family-planner/admin dev",
-    "build:backend": "pnpm --filter @family-planner/backend build",
+    "build:api": "pnpm --filter @family-planner/api build",
     "build:admin": "pnpm --filter @family-planner/admin build",
+    "build:all": "pnpm -r --filter=!@family-planner/mobile build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "db:migrate": "pnpm --filter @family-planner/backend migration:run",
-    "db:migrate:revert": "pnpm --filter @family-planner/backend migration:revert",
+    "db:migrate": "pnpm --filter @family-planner/api migration:run",
+    "db:seed": "pnpm --filter @family-planner/api seed",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "docker:build": "docker compose build"
+    "docker:build": "docker compose build --no-cache",
+    "docker:rebuild-api": "docker compose build --no-cache api worker scheduler && docker compose up -d api worker scheduler"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4"
   }
