@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { SyncService } from './sync.service';
+import { SyncJob } from './entities/sync-job.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([])],
+  imports: [TypeOrmModule.forFeature([SyncJob])],
   controllers: [],
-  providers: [],
-  exports: [],
+  providers: [SyncService],
+  exports: [SyncService],
 })
 export class SyncModule {}

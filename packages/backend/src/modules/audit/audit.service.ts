@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { OnEvent } from '@nestjs/event-emitter';
 import { AuditLog } from './entities/audit-log.entity';
 
 export interface CreateAuditLogDto {
@@ -16,6 +17,8 @@ export interface CreateAuditLogDto {
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
@@ -36,17 +39,41 @@ export class AuditService {
     return this.auditLogRepository.save(auditLog);
   }
 
-  async findByUser(userId: string): Promise<AuditLog[]> {
+  /**
+   * Empfängt 'audit.log' Events von anderen Modulen via EventEmitter.
+   * Verhindert direkte Modul-Abhängigkeiten von AuditModule.
+   */
+  @OnEvent('audit.log')
+  async handleAuditEvent(dto: CreateAuditLogDto): Promise<void> {
+    try {
+      await this.log(dto);
+    } catch (err) {
+      // Audit-Fehler dürfen die Hauptoperation NICHT unterbrechen
+      this.logger.error(`Failed to write audit log: ${(err as Error).message}`, { action: dto.action });
+    }
+  }
+
+  async findByUser(userId: string, limit = 100): Promise<AuditLog[]> {
     return this.auditLogRepository.find({
       where: { userId },
       order: { createdAt: 'DESC' },
+      take: limit,
     });
   }
 
-  async findByFamily(familyId: string): Promise<AuditLog[]> {
+  async findByFamily(familyId: string, limit = 100): Promise<AuditLog[]> {
     return this.auditLogRepository.find({
       where: { familyId },
       order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  async findByAction(action: string, limit = 100): Promise<AuditLog[]> {
+    return this.auditLogRepository.find({
+      where: { action },
+      order: { createdAt: 'DESC' },
+      take: limit,
     });
   }
 }
