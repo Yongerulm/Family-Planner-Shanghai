@@ -33,6 +33,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { SyncModule } from './modules/sync/sync.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { RedisModule } from './modules/redis/redis.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -98,6 +99,7 @@ import { HealthModule } from './modules/health/health.module';
     SyncModule,
     AuditModule,
     AdminModule,
+    RedisModule,
     HealthModule,
   ],
   providers: [

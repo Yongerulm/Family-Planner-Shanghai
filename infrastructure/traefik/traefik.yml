@@ -41,7 +41,7 @@ entryPoints:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "admin@yourdomain.tld"  # ANPASSEN
+      email: "ACME_EMAIL_PLACEHOLDER"  # Wird von deploy.sh durch ACME_EMAIL aus .env ersetzt
       storage: /certs/acme.json
       httpChallenge:
         entryPoint: web

@@ -37,7 +37,7 @@ log "acme.json bereit"
 step "Traefik E-Mail konfigurieren"
 ACME_EMAIL=$(grep -E '^ACME_EMAIL=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "")
 if [[ -n "$ACME_EMAIL" ]]; then
-  sed -i "s/admin@yourdomain.tld/$ACME_EMAIL/g" infrastructure/traefik/traefik.yml
+  sed -i "s/ACME_EMAIL_PLACEHOLDER/$ACME_EMAIL/g" infrastructure/traefik/traefik.yml
   log "ACME E-Mail gesetzt: $ACME_EMAIL"
 else
   warn "ACME_EMAIL nicht in .env — passe infrastructure/traefik/traefik.yml manuell an!"
@@ -51,29 +51,19 @@ step "Services starten"
 docker compose up -d
 log "Services gestartet"
 
-step "Auf API-Health warten (max. 120s)"
+step "Auf API-Readiness warten (max. 120s)"
 ATTEMPTS=0
 MAX_ATTEMPTS=24
-until docker compose exec -T api wget -qO- http://localhost:3000/api/health &>/dev/null; do
+until docker compose exec -T api wget -qO- http://localhost:3000/api/health/ready &>/dev/null; do
   ATTEMPTS=$((ATTEMPTS + 1))
   if [[ $ATTEMPTS -ge $MAX_ATTEMPTS ]]; then
-    err "API nicht erreichbar nach 120s. Logs: docker compose logs api"
+    err "API nicht bereit nach 120s. Logs: docker compose logs api"
   fi
   echo -n "."
   sleep 5
 done
 echo ""
-log "API ist bereit"
-
-step "Datenbank-Migrationen ausführen"
-docker compose exec -T api node dist/main --migrate-only || true
-# Fallback: direkt typeorm
-docker compose exec -T api sh -c "node -e \"require('./dist/database/data-source').AppDataSource.initialize().then(ds => ds.runMigrations()).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\"" || {
-  warn "Migration via App fehlgeschlagen, versuche direkten CLI-Aufruf..."
-  # Migrations laufen beim App-Start automatisch (migrationsRun: true)
-  log "Migrationen werden automatisch beim Start ausgeführt"
-}
-log "Migrationen abgeschlossen"
+log "API ist bereit (DB + Redis + MinIO gesund)"
 
 step "Status prüfen"
 docker compose ps

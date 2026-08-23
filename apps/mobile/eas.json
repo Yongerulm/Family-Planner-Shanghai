@@ -9,7 +9,9 @@
       "ios": { "simulator": true },
       "android": { "buildType": "apk" },
       "env": {
-        "API_URL": "http://localhost:3000"
+        "APP_BUNDLE_ID": "com.familyplanner.app.dev",
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000",
+        "EAS_PROJECT_ID": "HIER_EAS_PROJECT_ID_EINTRAGEN"
       }
     },
     "preview": {
@@ -17,7 +19,9 @@
       "ios": { "simulator": false },
       "android": { "buildType": "apk" },
       "env": {
-        "API_URL": "https://api.yourdomain.tld"
+        "APP_BUNDLE_ID": "com.familyplanner.app",
+        "EXPO_PUBLIC_API_URL": "HIER_API_URL_EINTRAGEN",
+        "EAS_PROJECT_ID": "HIER_EAS_PROJECT_ID_EINTRAGEN"
       }
     },
     "production": {
@@ -30,16 +34,18 @@
         "credentialsSource": "remote"
       },
       "env": {
-        "API_URL": "https://api.yourdomain.tld"
+        "APP_BUNDLE_ID": "com.familyplanner.app",
+        "EXPO_PUBLIC_API_URL": "HIER_API_URL_EINTRAGEN",
+        "EAS_PROJECT_ID": "HIER_EAS_PROJECT_ID_EINTRAGEN"
       }
     }
   },
   "submit": {
     "production": {
       "ios": {
-        "appleId": "deine@apple-id.com",
-        "ascAppId": "DEINE_APP_STORE_APP_ID",
-        "appleTeamId": "DEIN_TEAM_ID"
+        "appleId": "HIER_APPLE_ID_EINTRAGEN",
+        "ascAppId": "HIER_APP_STORE_APP_ID_EINTRAGEN",
+        "appleTeamId": "HIER_APPLE_TEAM_ID_EINTRAGEN"
       },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",

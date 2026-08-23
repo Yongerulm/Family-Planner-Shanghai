@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Family Planner — Zero-Downtime Update
+# Family Planner — Rolling Restart Update
 # =============================================================================
 # Ausführen auf dem VPS im Repo-Root:
 #   bash infrastructure/scripts/update.sh
@@ -44,15 +44,15 @@ step "API neu starten (Migrationen laufen automatisch)"
 docker compose up -d --no-deps api
 log "API gestartet"
 
-step "Auf API-Health warten (max. 90s)"
+step "Auf API-Readiness warten (max. 90s)"
 ATTEMPTS=0
-until docker compose exec -T api wget -qO- http://localhost:3000/api/health &>/dev/null; do
+until docker compose exec -T api wget -qO- http://localhost:3000/api/health/ready &>/dev/null; do
   ATTEMPTS=$((ATTEMPTS + 1))
-  [[ $ATTEMPTS -ge 18 ]] && err "API nicht gesund nach 90s. Logs: docker compose logs api"
+  [[ $ATTEMPTS -ge 18 ]] && err "API nicht bereit nach 90s. Logs: docker compose logs api"
   echo -n "."; sleep 5
 done
 echo ""
-log "API ist gesund"
+log "API ist bereit (DB + Redis + MinIO gesund)"
 
 step "Worker und Scheduler neu starten"
 docker compose up -d --no-deps worker scheduler
